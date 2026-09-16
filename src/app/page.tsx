@@ -4,6 +4,7 @@ import About from "@/components/About";
 import MenuBook from "@/components/MenuBook";
 import TestimonialFlow from "@/components/TestimonialFlow";
 import Gallery from "@/components/Gallery";
+import VirtualTour from "@/components/VirtualTour";
 import Location from "@/components/Location";
 import Footer from "@/components/Footer";
 
@@ -17,6 +18,7 @@ export default function Home() {
         <MenuBook />
         <TestimonialFlow />
         <Gallery />
+        <VirtualTour />
         <Location />
       </main>
       <Footer />
