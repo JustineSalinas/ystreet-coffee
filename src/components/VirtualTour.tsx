@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import Reveal from "./Reveal";
 
@@ -11,25 +11,27 @@ const ShopScene = dynamic(() => import("./ShopScene"), {
   loading: () => null,
 });
 
+const RealModelViewer = dynamic(() => import("./RealModelViewer"), {
+  ssr: false,
+  loading: () => null,
+});
+
 export default function VirtualTour() {
-  const [ready, setReady] = useState(false);
-  const [missing, setMissing] = useState(false);
-  const viewerRef = useRef<HTMLElement | null>(null);
+  // Only one WebGL context may be mounted at a time, so probe for the scanned
+  // model first and fall back to the stylized scene when it isn't there yet.
+  const [hasModel, setHasModel] = useState<boolean | null>(null);
 
   useEffect(() => {
-    import("@google/model-viewer");
-  }, []);
-
-  useEffect(() => {
-    const el = viewerRef.current;
-    if (!el) return;
-    const onLoad = () => setReady(true);
-    const onError = () => setMissing(true);
-    el.addEventListener("load", onLoad);
-    el.addEventListener("error", onError);
+    let cancelled = false;
+    fetch(MODEL_SRC, { method: "HEAD" })
+      .then((res) => {
+        if (!cancelled) setHasModel(res.ok);
+      })
+      .catch(() => {
+        if (!cancelled) setHasModel(false);
+      });
     return () => {
-      el.removeEventListener("load", onLoad);
-      el.removeEventListener("error", onError);
+      cancelled = true;
     };
   }, []);
 
@@ -48,39 +50,17 @@ export default function VirtualTour() {
             Step inside, from anywhere
           </h2>
           <p className="mt-4 text-paper/50">
-            Drag to orbit &middot; Scroll to zoom
+            Drag to look &middot; Walk in through the middle arch
           </p>
         </Reveal>
 
         <Reveal delay={0.1}>
           <div className="relative mx-auto aspect-[16/10] w-full max-w-4xl overflow-hidden rounded-[1.5rem] border border-gold/25 bg-charcoal shadow-[0_40px_90px_-20px_rgba(0,0,0,0.75)]">
-            <model-viewer
-              ref={viewerRef}
-              src={MODEL_SRC}
-              alt="Interactive 3D walkthrough of Y Street Coffee"
-              camera-controls
-              auto-rotate
-              auto-rotate-delay={2000}
-              rotation-per-second="8deg"
-              shadow-intensity="0.9"
-              exposure="0.95"
-              ar
-              ar-modes="webxr scene-viewer quick-look"
-              loading="lazy"
-              reveal="auto"
-              style={{
-                width: "100%",
-                height: "100%",
-                opacity: ready ? 1 : 0,
-                position: ready ? "relative" : "absolute",
-                transition: "opacity 0.6s ease",
-              }}
-            />
-
-            {!ready && (
+            {hasModel === true && <RealModelViewer src={MODEL_SRC} />}
+            {hasModel === false && (
               <>
                 <ShopScene />
-                <span className="absolute top-4 right-4 z-10 rounded-full border border-gold/30 bg-obsidian/60 px-3 py-1 text-[0.65rem] uppercase tracking-[0.15em] text-gold backdrop-blur-sm">
+                <span className="pointer-events-none absolute top-4 right-4 z-20 rounded-full border border-gold/30 bg-obsidian/60 px-3 py-1 text-[0.65rem] uppercase tracking-[0.15em] text-gold backdrop-blur-sm">
                   Artist&apos;s Impression
                 </span>
               </>
@@ -89,7 +69,7 @@ export default function VirtualTour() {
         </Reveal>
 
         <p className="mt-6 text-center text-paper/35 text-xs max-w-lg mx-auto leading-relaxed">
-          A stylized interpretation of Y Street&apos;s signature arches
+          A stylized interpretation of Y Street&apos;s storefront and interior
           &mdash; a real scanned walkthrough of the shop is in the works.
         </p>
       </div>
