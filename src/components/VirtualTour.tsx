@@ -1,12 +1,15 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import Image from "next/image";
-import { RotateCw } from "lucide-react";
+import dynamic from "next/dynamic";
 import Reveal from "./Reveal";
-import BeanIcon from "./BeanIcon";
 
 const MODEL_SRC = "/models/shop-tour.glb";
+
+const ShopScene = dynamic(() => import("./ShopScene"), {
+  ssr: false,
+  loading: () => null,
+});
 
 export default function VirtualTour() {
   const [ready, setReady] = useState(false);
@@ -45,7 +48,7 @@ export default function VirtualTour() {
             Step inside, from anywhere
           </h2>
           <p className="mt-4 text-paper/50">
-            Drag to look around &middot; Pinch or scroll to zoom
+            Drag to orbit &middot; Scroll to zoom
           </p>
         </Reveal>
 
@@ -54,7 +57,6 @@ export default function VirtualTour() {
             <model-viewer
               ref={viewerRef}
               src={MODEL_SRC}
-              poster="/images/hero-exterior.jpg"
               alt="Interactive 3D walkthrough of Y Street Coffee"
               camera-controls
               auto-rotate
@@ -69,43 +71,27 @@ export default function VirtualTour() {
               style={{
                 width: "100%",
                 height: "100%",
-                opacity: missing ? 0 : 1,
+                opacity: ready ? 1 : 0,
+                position: ready ? "relative" : "absolute",
                 transition: "opacity 0.6s ease",
               }}
             />
 
             {!ready && (
-              <div className="absolute inset-0">
-                <Image
-                  src="/images/hero-exterior.jpg"
-                  alt="Y Street Coffee storefront"
-                  fill
-                  className="object-cover"
-                  sizes="(min-width: 768px) 60vw, 90vw"
-                />
-                <div className="absolute inset-0 bg-obsidian/70" />
-              </div>
-            )}
-
-            {missing && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 px-8 text-center">
-                <BeanIcon className="h-8 w-8 text-gold" />
-                <p className="font-display text-2xl text-paper">
-                  3D tour in progress
-                </p>
-                <p className="max-w-sm text-paper/50 text-sm leading-relaxed">
-                  We&apos;re scanning the shop right now. Once it&apos;s
-                  ready, you&apos;ll be able to walk the arched corridor and
-                  look around in full 3D &mdash; right from this page.
-                </p>
-                <span className="mt-2 inline-flex items-center gap-2 rounded-full border border-gold/30 px-4 py-1.5 text-xs uppercase tracking-[0.15em] text-gold">
-                  <RotateCw className="h-3.5 w-3.5" strokeWidth={1.75} />
-                  Coming soon
+              <>
+                <ShopScene />
+                <span className="absolute top-4 right-4 z-10 rounded-full border border-gold/30 bg-obsidian/60 px-3 py-1 text-[0.65rem] uppercase tracking-[0.15em] text-gold backdrop-blur-sm">
+                  Artist&apos;s Impression
                 </span>
-              </div>
+              </>
             )}
           </div>
         </Reveal>
+
+        <p className="mt-6 text-center text-paper/35 text-xs max-w-lg mx-auto leading-relaxed">
+          A stylized interpretation of Y Street&apos;s signature arches
+          &mdash; a real scanned walkthrough of the shop is in the works.
+        </p>
       </div>
     </section>
   );
