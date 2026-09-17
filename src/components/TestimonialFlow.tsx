@@ -43,8 +43,8 @@ function FlowRow({
 }) {
   const trackRef = useRef<HTMLDivElement>(null);
   const x = useMotionValue(0);
-  const halted = useRef(false);
-  const wheelTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hovered = useRef(false);
+  const drag = useRef({ active: false, lastX: 0 });
   const [setWidth, setSetWidth] = useState(0);
 
   const doubled = [...items, ...items];
@@ -60,29 +60,43 @@ function FlowRow({
     return () => window.removeEventListener("resize", measure);
   }, [items]);
 
-  // continuous velocity-based loop; picks up from wherever x currently is,
-  // so dragging or scrolling never causes a jump when it resumes.
+  // Constant-velocity loop that always continues from wherever x currently is.
+  // Pauses while hovered or being dragged; the delta clamp stops a jump after
+  // the tab has been in the background.
   useAnimationFrame((_, delta) => {
-    if (halted.current || !setWidth) return;
-    const moveBy = direction * -1 * speed * (delta / 1000);
-    x.set(wrap(-setWidth, 0, x.get() + moveBy));
+    if (!setWidth || hovered.current || drag.current.active) return;
+    const dt = Math.min(delta, 50) / 1000;
+    x.set(wrap(-setWidth, 0, x.get() - direction * speed * dt));
   });
 
-  const halt = () => {
-    halted.current = true;
+  // Manual drag instead of framer's: no inertia to fight the loop, and the
+  // position wraps continuously so there is no edge to hit.
+  const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    drag.current = { active: true, lastX: e.clientX };
+    e.currentTarget.setPointerCapture(e.pointerId);
   };
-  const resume = () => {
-    halted.current = false;
+  const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!drag.current.active || !setWidth) return;
+    const dx = e.clientX - drag.current.lastX;
+    drag.current.lastX = e.clientX;
+    x.set(wrap(-setWidth, 0, x.get() + dx));
+  };
+  const endDrag = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!drag.current.active) return;
+    drag.current.active = false;
+    // Releasing a drag resumes motion even if the cursor is still over the row.
+    hovered.current = false;
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    }
   };
 
+  // Only clearly horizontal trackpad swipes nudge the row; vertical wheel
+  // scrolling is left entirely to the page.
   const onWheel = (e: React.WheelEvent) => {
-    const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
-    if (delta === 0 || !setWidth) return;
-    e.preventDefault();
-    halt();
-    x.set(wrap(-setWidth, 0, x.get() - delta));
-    if (wheelTimeout.current) clearTimeout(wheelTimeout.current);
-    wheelTimeout.current = setTimeout(resume, 700);
+    if (!setWidth || Math.abs(e.deltaX) <= Math.abs(e.deltaY)) return;
+    x.set(wrap(-setWidth, 0, x.get() - e.deltaX));
   };
 
   return (
@@ -94,19 +108,22 @@ function FlowRow({
         maskImage:
           "linear-gradient(to right, transparent, black 6%, black 94%, transparent)",
       }}
-      onMouseEnter={halt}
-      onMouseLeave={resume}
+      onMouseEnter={() => {
+        hovered.current = true;
+      }}
+      onMouseLeave={() => {
+        hovered.current = false;
+      }}
       onWheel={onWheel}
     >
       <motion.div
         ref={trackRef}
         className="flex w-max gap-5 cursor-grab active:cursor-grabbing"
-        style={{ x }}
-        drag="x"
-        dragConstraints={{ left: -setWidth * 3, right: setWidth }}
-        dragElastic={0.06}
-        onDragStart={halt}
-        onDragEnd={resume}
+        style={{ x, touchAction: "pan-y" }}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={endDrag}
+        onPointerCancel={endDrag}
       >
         {doubled.map((review, i) => (
           <TestimonialCard key={`${review.name}-${i}`} review={review} />
