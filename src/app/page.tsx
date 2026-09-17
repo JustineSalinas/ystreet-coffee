@@ -7,6 +7,7 @@ import Gallery from "@/components/Gallery";
 import VirtualTour from "@/components/VirtualTour";
 import Location from "@/components/Location";
 import FAQ from "@/components/FAQ";
+import Concierge from "@/components/Concierge";
 import Footer from "@/components/Footer";
 
 export default function Home() {
@@ -24,6 +25,7 @@ export default function Home() {
         <FAQ />
       </main>
       <Footer />
+      <Concierge />
     </>
   );
 }

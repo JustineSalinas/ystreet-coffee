@@ -659,13 +659,20 @@ export default function ShopScene() {
   };
 
   useEffect(() => {
+    // Typing in a text field elsewhere on the page must not walk the camera.
+    const isTyping = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      return !!t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable);
+    };
     const onKeyDown = (e: KeyboardEvent) => {
+      if (isTyping(e)) return;
       if (["w", "W", "ArrowUp"].includes(e.key)) setMove("f", true);
       if (["s", "S", "ArrowDown"].includes(e.key)) setMove("b", true);
       if (["a", "A", "ArrowLeft"].includes(e.key)) setMove("l", true);
       if (["d", "D", "ArrowRight"].includes(e.key)) setMove("r", true);
     };
     const onKeyUp = (e: KeyboardEvent) => {
+      if (isTyping(e)) return;
       if (["w", "W", "ArrowUp"].includes(e.key)) setMove("f", false);
       if (["s", "S", "ArrowDown"].includes(e.key)) setMove("b", false);
       if (["a", "A", "ArrowLeft"].includes(e.key)) setMove("l", false);
