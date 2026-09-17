@@ -62,16 +62,19 @@ export default function DishModal({
                   {item.name}
                 </h3>
                 {item.hotPrice ? (
-                  <span className="text-sm text-ink/70 whitespace-nowrap shrink-0 mt-1">
-                    <span className="text-ink/40 text-[0.65rem] mr-1">HOT</span>
-                    ₱{item.hotPrice}
-                    <span className="text-ink/40 text-[0.65rem] mx-1">/</span>
-                    <span className="text-ink/40 text-[0.65rem] mr-1">ICED</span>
-                    ₱{item.icedPrice}
+                  <span className="flex shrink-0 gap-4 font-mono mt-1">
+                    <span className="flex flex-col items-center leading-none">
+                      <span className="text-[0.55rem] tracking-[0.15em] text-ink/45">HOT</span>
+                      <span className="mt-1 text-sm font-bold text-ink">{item.hotPrice}PHP</span>
+                    </span>
+                    <span className="flex flex-col items-center leading-none">
+                      <span className="text-[0.55rem] tracking-[0.15em] text-ink/45">ICED</span>
+                      <span className="mt-1 text-sm font-bold text-ink">{item.icedPrice}PHP</span>
+                    </span>
                   </span>
                 ) : (
-                  <span className="font-display text-xl text-gold shrink-0 mt-0.5">
-                    ₱{item.price}
+                  <span className="font-mono text-base font-bold text-ink shrink-0 mt-1">
+                    {item.price}PHP
                   </span>
                 )}
               </div>

@@ -24,6 +24,7 @@
   --color-line-invert: var(--line-invert);
   --font-display: var(--font-fraunces);
   --font-sans: var(--font-inter);
+  --font-mono: var(--font-space-mono);
 }
 
 html {
@@ -56,7 +57,7 @@ body {
 
 /* Subtle fibre noise so the book pages read as paper rather than flat colour. */
 .paper-page {
-  background-color: var(--paper);
+  background-color: #f6f5e8;
   background-image: radial-gradient(
       ellipse at 35% 25%,
       rgba(255, 255, 255, 0.4),
