@@ -26,9 +26,13 @@ export default function Header() {
 
   return (
     <header
-      className={`fixed top-0 inset-x-0 z-50 transition-all duration-500 ${
+      // Promoted to its own compositor layer (and no backdrop-filter): with Lenis
+      // driving scrollTo every frame, an un-promoted fixed header lags a frame
+      // behind on fast scrolls and paints a displaced band under the nav.
+      style={{ willChange: "transform", transform: "translateZ(0)" }}
+      className={`fixed top-0 inset-x-0 z-50 transition-[background-color,padding,border-color] duration-500 ${
         scrolled
-          ? "bg-paper/95 backdrop-blur-md border-b border-line py-3"
+          ? "bg-paper border-b border-line py-3"
           : "bg-transparent py-6"
       }`}
     >
