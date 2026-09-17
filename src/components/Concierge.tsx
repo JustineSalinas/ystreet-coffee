@@ -103,9 +103,31 @@ function BotBubble({
   );
 }
 
+const TEASER_KEY = "ystreet-concierge-teaser";
+
 export default function Concierge() {
   const lenis = useLenis();
   const [open, setOpen] = useState(false);
+  const [teaser, setTeaser] = useState(false);
+
+  // A friendly nudge beside the launcher, a beat after the preloader clears.
+  // Dismissing it (or opening the chat) keeps it away for the rest of the visit.
+  useEffect(() => {
+    let dismissed = false;
+    try {
+      dismissed = sessionStorage.getItem(TEASER_KEY) === "1";
+    } catch {}
+    if (dismissed) return;
+    const t = setTimeout(() => setTeaser(true), 3200);
+    return () => clearTimeout(t);
+  }, []);
+
+  const dismissTeaser = () => {
+    setTeaser(false);
+    try {
+      sessionStorage.setItem(TEASER_KEY, "1");
+    } catch {}
+  };
   const [input, setInput] = useState("");
   const [typing, setTyping] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
@@ -249,9 +271,48 @@ export default function Concierge() {
         )}
       </AnimatePresence>
 
+      <AnimatePresence>
+        {teaser && !open && (
+          <motion.div
+            key="teaser"
+            initial={{ opacity: 0, y: 10, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 6, scale: 0.96 }}
+            transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+            className="fixed bottom-24 right-4 z-[90] w-[min(calc(100vw-2rem),290px)] sm:right-6"
+          >
+            <button
+              onClick={() => {
+                dismissTeaser();
+                setOpen(true);
+              }}
+              className="relative block w-full rounded-2xl border border-gold/25 bg-charcoal px-4 py-3 text-left text-[0.85rem] leading-snug text-paper shadow-[0_18px_40px_-12px_rgba(0,0,0,0.7)]"
+            >
+              <span className="mr-1.5" aria-hidden>
+                👋
+              </span>
+              Hi! I&apos;m the Y Street concierge — ask me about the menu, hours, or
+              how to find us.
+              {/* tail pointing at the launcher */}
+              <span className="absolute -bottom-1.5 right-6 h-3 w-3 rotate-45 border-b border-r border-gold/25 bg-charcoal" />
+            </button>
+            <button
+              aria-label="Dismiss"
+              onClick={dismissTeaser}
+              className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full border border-gold/30 bg-obsidian text-paper/70 hover:text-paper"
+            >
+              <X className="h-3 w-3" strokeWidth={2} />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <motion.button
         aria-label={open ? "Close concierge" : "Ask the concierge"}
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => {
+          if (!open) dismissTeaser();
+          setOpen((o) => !o);
+        }}
         whileTap={{ scale: 0.94 }}
         className="fixed bottom-6 right-4 z-[90] flex h-14 w-14 items-center justify-center rounded-full bg-gold text-obsidian shadow-[0_18px_40px_-12px_rgba(0,0,0,0.7)] sm:right-6"
       >
