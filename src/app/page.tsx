@@ -6,6 +6,7 @@ import TestimonialFlow from "@/components/TestimonialFlow";
 import Gallery from "@/components/Gallery";
 import VirtualTour from "@/components/VirtualTour";
 import Location from "@/components/Location";
+import FAQ from "@/components/FAQ";
 import Footer from "@/components/Footer";
 
 export default function Home() {
@@ -20,6 +21,7 @@ export default function Home() {
         <Gallery />
         <VirtualTour />
         <Location />
+        <FAQ />
       </main>
       <Footer />
     </>

@@ -54,6 +54,17 @@ body {
   filter: grayscale(0);
 }
 
+/* Subtle fibre noise so the book pages read as paper rather than flat colour. */
+.paper-page {
+  background-color: var(--paper);
+  background-image: radial-gradient(
+      ellipse at 35% 25%,
+      rgba(255, 255, 255, 0.4),
+      transparent 65%
+    ),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.05 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
 .menu-scroll {
   scrollbar-width: thin;
   scrollbar-color: var(--gold) transparent;
