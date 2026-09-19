@@ -268,15 +268,65 @@ function recommend(q: string): Reply {
   };
 }
 
+// The priciest way to order the item, mirroring numericPrice's "lowest" logic
+// (iced/hot variants can differ, so "most expensive" should reflect the top end).
+const numericPriceHigh = (item: MenuItem) => {
+  const candidates = [item.price, item.hotPrice, item.icedPrice]
+    .map((p) => Number(p))
+    .filter((n) => n > 0);
+  return candidates.length ? Math.max(...candidates) : 0;
+};
+
+const DRINK_CATEGORIES = new Set(["espresso", "matcha", "non-coffee", "frappe", "tea"]);
+const FOOD_CATEGORIES = new Set(["mains", "breakfast", "snacks"]);
+
+// "cheapest drink" or "most expensive food" without a specific category still
+// needs scoping — otherwise a price search silently mixes drinks and meals,
+// which reads as wrong even though nothing crashed (e.g. "most expensive
+// drink" returning the 330PHP breakfast plate).
+function scopedPool(q: string, category?: MenuCategory): Hit[] {
+  if (category) return category.items.map((item) => ({ item, category }));
+  if (has(q, "drink", "beverage", "coffee", "sip"))
+    return allHits().filter((h) => DRINK_CATEGORIES.has(h.category.id));
+  if (has(q, "food", "meal", "dish", "eat", "snack"))
+    return allHits().filter((h) => FOOD_CATEGORIES.has(h.category.id));
+  return allHits();
+}
+
+function priciestFilter(q: string, category?: MenuCategory): Reply | undefined {
+  if (
+    !has(q, "expensive", "priciest", "costliest", "premium", "pricey") &&
+    !(has(q, "highest", "top") && has(q, "price", "priced", "cost"))
+  ) {
+    return undefined;
+  }
+
+  const pool = scopedPool(q, category);
+  const hits = pool
+    .filter((h) => numericPriceHigh(h.item) > 0)
+    .sort((a, b) => numericPriceHigh(b.item) - numericPriceHigh(a.item))
+    .slice(0, 5);
+
+  if (!hits.length) return undefined;
+
+  const scope = category ? ` in ${category.title}` : "";
+  const one = hits.length === 1;
+  return {
+    text: one
+      ? `That'd be the ${hits[0].item.name} at ${numericPriceHigh(hits[0].item)}PHP.`
+      : `The priciest${scope}:`,
+    items: hits,
+    chips: ["What's cheapest?", "What's good?", "Open the menu"],
+  };
+}
+
 function priceFilter(q: string, category?: MenuCategory): Reply | undefined {
   const m = q.match(/(?:under|below|less than|max|up to|within|budget of)\s*₱?\s*(\d{2,4})/);
   const cheap = has(q, "cheap", "cheapest", "budget", "affordable", "lowest");
   if (!m && !cheap) return undefined;
 
   const limit = m ? Number(m[1]) : 160;
-  const pool = category
-    ? category.items.map((item) => ({ item, category }))
-    : allHits();
+  const pool = scopedPool(q, category);
   const hits = pool
     .filter((h) => numericPrice(h.item) > 0 && numericPrice(h.item) <= limit)
     .sort((a, b) => numericPrice(a.item) - numericPrice(b.item))
@@ -290,10 +340,10 @@ function priceFilter(q: string, category?: MenuCategory): Reply | undefined {
       .slice(0, 3);
     const from = cheapest[0] ? numericPrice(cheapest[0].item) : 0;
     return {
-      text: category
-        ? `Nothing in ${category.title} is ${limit}PHP or under — the most affordable start at ${from}PHP:`
-        : `Nothing comes in at ${limit}PHP or under. The most affordable is the Espresso at 80PHP.`,
-      items: category ? cheapest : pick(["Espresso"]),
+      text: cheapest.length
+        ? `Nothing${category ? ` in ${category.title}` : ""} is ${limit}PHP or under — the most affordable start${cheapest.length > 1 ? "" : "s"} at ${from}PHP:`
+        : `Nothing comes in at ${limit}PHP or under.`,
+      items: cheapest,
       chips: ["Under 150", "Show me tea", "Open the menu"],
     };
   }
@@ -386,6 +436,9 @@ export function answer(raw: string): Reply {
 
   const priced = priceFilter(q, category);
   if (priced) return priced;
+
+  const priciest = priciestFilter(q, category);
+  if (priciest) return priciest;
 
   const wantsPick = has(q, "recommend", "suggest", "whats good", "what is good", "best", "popular", "favourite", "favorite", "must try", "signature", "bestseller", "number one", "something ") || hasWord(q, "top");
   const hasMood = has(q, "caffeine", "tired", "sleepy", "wake", "energy", "hungry", "sweet", "rainy", "chilly", "hot day", "humid", "refresh", "bitter", "quick", "cold", "cool", "iced", "warm") || hasWord(q, "fast");
