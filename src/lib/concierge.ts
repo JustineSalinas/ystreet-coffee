@@ -143,22 +143,33 @@ const GENERIC_WORDS = new Set([
   "chicken", "beef", "breakfast", "series", "based", "with", "and", "the",
 ]);
 
-function matchItems(q: string): Hit[] {
+// Only the literal "the query contains this item's full name" match —
+// deliberately excludes the fuzzy/typo fallback below. Naming an exact item
+// is unambiguous even if a mood word ("cold brew" ⊃ "cold") or a category
+// keyword ("brew") also happens to appear in the same message, so callers use
+// this to decide whether mood/category routing should be allowed to run at
+// all before falling back to it.
+function exactItemMatches(q: string): Hit[] {
   const hits = allHits();
   const exact = hits.filter((h) => q.includes(h.item.name.toLowerCase()));
-  if (exact.length) {
-    // "spanish latte" should not also return "Latte".
-    return exact.filter(
-      (h) =>
-        !exact.some(
-          (o) =>
-            o !== h &&
-            o.item.name.length > h.item.name.length &&
-            o.item.name.toLowerCase().includes(h.item.name.toLowerCase())
-        )
-    );
-  }
+  if (!exact.length) return [];
+  // "spanish latte" should not also return "Latte".
+  return exact.filter(
+    (h) =>
+      !exact.some(
+        (o) =>
+          o !== h &&
+          o.item.name.length > h.item.name.length &&
+          o.item.name.toLowerCase().includes(h.item.name.toLowerCase())
+      )
+  );
+}
 
+function matchItems(q: string): Hit[] {
+  const exact = exactItemMatches(q);
+  if (exact.length) return exact;
+
+  const hits = allHits();
   // Fall back to distinctive words, tolerating small typos ("carbonarra",
   // "espreso", "machiato") rather than requiring an exact prefix.
   const words = q.split(" ").filter((w) => w.length >= 4 && !GENERIC_WORDS.has(w));
@@ -382,6 +393,17 @@ export function answer(raw: string): Reply {
   }
 
   /* --- practical info --- */
+  // Must come before the hours check below: "open" collides with both
+  // "what time do you open" (hours) and "when did you open" (founding date) —
+  // very different questions we don't want to answer with the wrong one.
+  if (has(q, "when did you open", "when did you start", "how long have you been open", "how long have you been around", "founded", "established", "since when")) {
+    return {
+      text: `I don't have the exact opening date on hand — ${business.email} or ${business.instagram} would know.`,
+      link: { label: "Message on Instagram", href: business.instagramUrl },
+      chips: ["What are your hours?", "What's good?"],
+    };
+  }
+
   const asksHours = has(q, "hour", "open", "close", "closing", "what time", "until", "sunday", "weekend", "holiday");
   const asksWhere = has(q, "where", "location", "address", "direction", "map", "find you", "how to get", "located", "parking", "park");
   if (asksHours && asksWhere) {
@@ -417,13 +439,44 @@ export function answer(raw: string): Reply {
       chips: ["Where are you?", "What's good?"],
     };
   }
-  if (hasWord(q, "pet", "dog", "cat") || has(q, "outside food", "bring food", "own food", "smok")) {
+  if (hasWord(q, "pet", "dog", "cat") || has(q, "outside food", "bring food", "own food")) {
     return {
       text: "Outside food isn't allowed, and pets aren't permitted inside the shop.",
       chips: ["Do you serve food?", "What are your hours?"],
     };
   }
-  if (has(q, "reserv", "book a table", "booking", "event", "party", "cater", "deliver", "grab", "foodpanda", "gcash", "card")) {
+  if (has(q, "smok", "vape", "vaping")) {
+    return {
+      text: `Not something we have posted policy on here — best to confirm with the team directly at ${business.email} or ${business.instagram}.`,
+      link: { label: "Message on Instagram", href: business.instagramUrl },
+      chips: ["Where are you?", "What are your hours?"],
+    };
+  }
+  if (
+    has(q, "gcash", "credit card", "debit card", "cash only", "cashless", "e wallet", "ewallet", "maya") ||
+    (hasWord(q, "card") && has(q, "pay", "payment", "accept"))
+  ) {
+    return {
+      text: `I don't have the exact payment methods listed here — ${business.email} or ${business.instagram} can confirm before you head over.`,
+      link: { label: "Message on Instagram", href: business.instagramUrl },
+      chips: ["Where are you?", "What's good?"],
+    };
+  }
+  if (has(q, "how many seats", "seating capacity", "how big is", "accommodate", "group of", "big group", "large group", "how many people", "how many pax")) {
+    return {
+      text: `I don't have exact seating numbers — it's a cozy space rather than a huge one. For bigger groups, it's worth checking with the team first: ${business.email} or ${business.instagram}.`,
+      link: { label: "Message on Instagram", href: business.instagramUrl },
+      chips: ["Where are you?", "What are your hours?"],
+    };
+  }
+  if (has(q, "mug", "tumbler", "merch", "merchandise", " tote", "keychain")) {
+    return {
+      text: `Merch isn't listed here — DM ${business.instagram} to check what's currently available.`,
+      link: { label: "Message on Instagram", href: business.instagramUrl },
+      chips: ["What's good?", "Open the menu"],
+    };
+  }
+  if (has(q, "reserv", "book a table", "booking", "event", "party", "cater", "deliver", "grab", "foodpanda")) {
     return {
       text: `That's one for the team directly — email ${business.email} or DM ${business.instagram} and they'll sort you out.`,
       link: { label: "Message on Instagram", href: business.instagramUrl },
@@ -440,14 +493,24 @@ export function answer(raw: string): Reply {
   const priciest = priciestFilter(q, category);
   if (priciest) return priciest;
 
-  const wantsPick = has(q, "recommend", "suggest", "whats good", "what is good", "best", "popular", "favourite", "favorite", "must try", "signature", "bestseller", "number one", "something ") || hasWord(q, "top");
-  const hasMood = has(q, "caffeine", "tired", "sleepy", "wake", "energy", "hungry", "sweet", "rainy", "chilly", "hot day", "humid", "refresh", "bitter", "quick", "cold", "cool", "iced", "warm") || hasWord(q, "fast");
-  if (wantsPick || hasMood) {
-    return recommend(q);
-  }
-
+  // Naming a real item by its exact name ("cold brew price", "espresso or
+  // cold brew") is a stronger, more specific signal than a generic mood word
+  // or category keyword the name itself happens to contain ("cold brew" ⊃
+  // "cold" and "brew") — so resolve exact matches before mood/category
+  // routing gets a chance to hijack them, not after.
   const items = matchItems(q);
   const askingForCategory = has(q, "show", "list", "all", "what do you have", "options", "menu", "kinds", "types");
+
+  const wantsPick = has(q, "recommend", "suggest", "whats good", "what is good", "best", "popular", "favourite", "favorite", "must try", "signature", "bestseller", "number one", "something ") || hasWord(q, "top");
+  const hasMood = has(q, "caffeine", "tired", "sleepy", "wake", "energy", "hungry", "sweet", "rainy", "chilly", "hot day", "humid", "refresh", "bitter", "quick", "cold", "cool", "iced", "warm") || hasWord(q, "fast");
+  // Explicit "recommend"/"what's good" phrasing always means recommendation
+  // intent, even if the query also happens to contain a literal item name
+  // (e.g. "matcha series" ⊃ the item "Matcha") — that phrasing is a much
+  // stronger signal than a mood word alone, so it skips the exact-match
+  // carve-out below rather than being subject to it.
+  if (wantsPick) return recommend(q);
+  if (hasMood && exactItemMatches(q).length === 0) return recommend(q);
+
   if (items.length && !(askingForCategory && category)) {
     const one = items.length === 1;
     const comparing = items.length > 1 && has(q, " or ", " vs ", " versus ", "compare", "difference");
@@ -475,7 +538,7 @@ export function answer(raw: string): Reply {
     };
   }
 
-  if (has(q, "serve", "food", "eat", "menu", "drink", "sell")) {
+  if (has(q, "serve", "food", "menu", "drink", "sell") || hasWord(q, "eat")) {
     return {
       text: "The menu covers espresso drinks, matcha, frappes, tea, rice meals and pasta, all-day breakfast, and snacks. Which sounds good?",
       chips: ["Show me espresso", "Show me matcha", "Show me breakfast", "Show me snacks"],
