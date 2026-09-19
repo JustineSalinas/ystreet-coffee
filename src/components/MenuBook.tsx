@@ -27,28 +27,26 @@ const TURN_MS = 720;
 const EASE: [number, number, number, number] = [0.65, 0, 0.35, 1];
 
 /* ---------------------------------------- pages ---------------------------------------- */
-/* Typography and price format follow the printed Y Street menu sheets: cream stock,
-   a small uppercase label, items on a grid in bold monospace, and prices set as
-   "130PHP" with tiny HOT / ICED captions above the pair.                            */
+/* A classic printed-menu treatment: serif item names on a dotted leader out to
+   the price, with monospace reserved for structural type (labels, page numbers,
+   the price figures themselves) as an accent rather than the whole page.       */
 
 function Price({ item }: { item: MenuItem }) {
   if (item.hotPrice && item.icedPrice) {
     return (
-      <div className="mt-1.5 flex gap-3 font-mono">
-        <div className="flex flex-col items-center leading-none">
-          <span className="text-[0.5rem] tracking-[0.15em] text-ink/50">HOT</span>
-          <span className="mt-1 text-[0.72rem] font-bold text-ink">{item.hotPrice}PHP</span>
-        </div>
-        <div className="flex flex-col items-center leading-none">
-          <span className="text-[0.5rem] tracking-[0.15em] text-ink/50">ICED</span>
-          <span className="mt-1 text-[0.72rem] font-bold text-ink">{item.icedPrice}PHP</span>
-        </div>
-      </div>
+      <span className="shrink-0 whitespace-nowrap font-mono text-[0.68rem] text-ink/60">
+        <span className="mr-1 text-[0.55rem] tracking-[0.1em] text-ink/40">HOT</span>
+        {item.hotPrice}
+        <span className="mx-1.5 text-ink/30">/</span>
+        <span className="mr-1 text-[0.55rem] tracking-[0.1em] text-ink/40">ICED</span>
+        {item.icedPrice}
+      </span>
     );
   }
   return (
-    <span className="mt-1.5 block font-mono text-[0.72rem] font-bold leading-none text-ink">
-      {item.price}PHP
+    <span className="shrink-0 whitespace-nowrap font-display text-[1.05rem] leading-none text-gold">
+      {item.price}
+      <span className="ml-0.5 font-mono text-[0.55rem] text-ink/40">PHP</span>
     </span>
   );
 }
@@ -61,22 +59,23 @@ function DishCard({
   onSelect: () => void;
 }) {
   return (
-    <li>
+    <li className="break-inside-avoid">
       <button
         onClick={onSelect}
         data-dish
-        className="group flex w-full flex-col items-center rounded-md px-1 py-2 text-center transition-colors hover:bg-gold/10"
+        className="group flex w-full items-baseline gap-2 rounded-md px-1.5 py-1.5 text-left transition-colors hover:bg-gold/10"
       >
-        <span className="font-mono text-[0.78rem] font-bold leading-tight text-ink group-hover:text-gold transition-colors">
+        <span className="shrink-0 whitespace-nowrap font-display text-[0.98rem] leading-tight text-ink transition-colors group-hover:text-gold">
           {item.name}
         </span>
+        <span className="mb-[3px] flex-1 border-b border-dotted border-ink/25" />
         <Price item={item} />
-        {item.description && (
-          <span className="mt-1.5 block text-[0.6rem] italic leading-snug text-ink/50">
-            {item.description}
-          </span>
-        )}
       </button>
+      {item.description && (
+        <p className="px-1.5 pb-1.5 -mt-0.5 text-[0.68rem] italic leading-snug text-ink/45">
+          {item.description}
+        </p>
+      )}
     </li>
   );
 }
@@ -94,13 +93,13 @@ function PageChrome({
 }) {
   return (
     <div className="paper-page relative flex h-full w-full flex-col px-5 pt-5 pb-7 sm:px-7 sm:pt-6">
-      <div className="flex items-baseline justify-between border-b border-ink/15 pb-2">
-        <span className="font-mono text-[0.68rem] uppercase tracking-[0.2em] text-ink">
+      <div className="flex items-baseline justify-between border-b border-gold/25 pb-2">
+        <span className="font-display text-[0.95rem] uppercase tracking-[0.15em] text-ink">
           {label}
         </span>
         <span className="font-mono text-[0.6rem] text-ink/40">{String(pageNo).padStart(2, "0")}</span>
       </div>
-      <div className="menu-scroll min-h-0 flex-1 overflow-y-auto" style={{ touchAction: "pan-y" }}>
+      <div className="menu-scroll min-h-0 flex-1 overflow-y-auto overflow-x-hidden" style={{ touchAction: "pan-y" }}>
         <div className="flex min-h-full flex-col">{children}</div>
       </div>
       <span
@@ -125,17 +124,12 @@ function CategoryPage({
   side: "left" | "right";
   onSelect: (item: MenuItem) => void;
 }) {
-  const dense = category.items.length > 8;
   return (
     <PageChrome label={category.title} pageNo={pageNo} side={side}>
       {category.subtitle && (
         <p className="mt-3 font-display italic text-[0.8rem] text-ink/55">{category.subtitle}</p>
       )}
-      <ul
-        className={`mt-4 grid gap-x-2 ${
-          dense ? "grid-cols-2 sm:grid-cols-3 gap-y-4" : "grid-cols-2 gap-y-5"
-        }`}
-      >
+      <ul className="mt-4">
         {category.items.map((item) => (
           <DishCard key={item.name} item={item} onSelect={() => onSelect(item)} />
         ))}
