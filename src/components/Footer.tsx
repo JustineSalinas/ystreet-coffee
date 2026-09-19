@@ -6,7 +6,7 @@ export default function Footer() {
   return (
     <footer className="relative bg-obsidian text-paper/70 border-t border-gold/15">
       <div className="mx-auto max-w-6xl px-6 py-16 grid gap-12 sm:grid-cols-2 md:grid-cols-4">
-        <div className="col-span-2 md:col-span-1">
+        <div className="col-span-2 min-w-0 md:col-span-1">
           <a href="#top" className="flex items-center gap-3">
             <Image
               src="/images/logo-mark.png"
@@ -25,7 +25,7 @@ export default function Footer() {
           </p>
         </div>
 
-        <div>
+        <div className="min-w-0">
           <p className="text-xs uppercase tracking-[0.2em] text-gold/70 mb-4">
             Explore
           </p>
@@ -53,7 +53,7 @@ export default function Footer() {
           </ul>
         </div>
 
-        <div>
+        <div className="min-w-0">
           <p className="text-xs uppercase tracking-[0.2em] text-gold/70 mb-4">
             Visit
           </p>
@@ -64,7 +64,7 @@ export default function Footer() {
           <p className="text-sm mt-3">Open daily · 10AM – 10PM</p>
         </div>
 
-        <div>
+        <div className="min-w-0">
           <p className="text-xs uppercase tracking-[0.2em] text-gold/70 mb-4">
             Say Hello
           </p>
@@ -75,7 +75,7 @@ export default function Footer() {
                 className="flex items-center gap-2 hover:text-gold transition-colors"
               >
                 <Mail className="h-4 w-4 shrink-0" strokeWidth={1.5} />
-                ystreetcoffee@gmail.com
+                <span className="break-all">ystreetcoffee@gmail.com</span>
               </a>
             </li>
             <li>
