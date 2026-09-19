@@ -775,7 +775,7 @@ export default function MenuBook() {
       <DishModal
         item={selected?.item ?? null}
         categoryTitle={selected?.category.title ?? ""}
-        image={selected?.item.image ?? selected?.category.image ?? ""}
+        image={selected?.item.image}
         onClose={() => setSelected(null)}
       />
     </section>
