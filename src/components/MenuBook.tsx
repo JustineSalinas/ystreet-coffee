@@ -341,8 +341,13 @@ export default function MenuBook() {
   );
 
   // Switching layouts re-maps pages to leaves, so start the book closed again.
-  useEffect(() => {
+  const [prevSingle, setPrevSingle] = useState(single);
+  if (single !== prevSingle) {
+    setPrevSingle(single);
     setFlipped(0);
+  }
+
+  useEffect(() => {
     rotations.forEach((mv) => mv.set(0));
     prevFlipped.current = 0;
   }, [single, rotations]);
