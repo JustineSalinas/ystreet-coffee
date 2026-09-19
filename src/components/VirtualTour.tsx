@@ -49,7 +49,16 @@ export default function VirtualTour() {
           <h2 className="font-display text-4xl sm:text-5xl text-paper">
             Step inside, from anywhere
           </h2>
-          <p className="mt-4 text-paper/50">
+          <div className="mt-4 flex items-center justify-center gap-2">
+            <span className="relative flex h-2 w-2">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-gold/60" />
+              <span className="relative inline-flex h-2 w-2 rounded-full bg-gold" />
+            </span>
+            <p className="text-paper/60 text-sm uppercase tracking-[0.15em]">
+              In Progress &middot; Preview
+            </p>
+          </div>
+          <p className="mt-2 text-paper/40 text-sm">
             Drag to look &middot; Walk in through the middle arch
           </p>
         </Reveal>
@@ -60,8 +69,9 @@ export default function VirtualTour() {
             {hasModel === false && (
               <>
                 <ShopScene />
-                <span className="pointer-events-none absolute top-4 right-4 z-20 rounded-full border border-gold/30 bg-obsidian/60 px-3 py-1 text-[0.65rem] uppercase tracking-[0.15em] text-gold backdrop-blur-sm">
-                  Artist&apos;s Impression
+                <span className="pointer-events-none absolute top-4 right-4 z-20 flex items-center gap-1.5 rounded-full border border-gold/30 bg-obsidian/60 px-3 py-1 text-[0.65rem] uppercase tracking-[0.15em] text-gold backdrop-blur-sm">
+                  <span className="h-1.5 w-1.5 rounded-full bg-gold" />
+                  In Progress
                 </span>
               </>
             )}
@@ -69,8 +79,9 @@ export default function VirtualTour() {
         </Reveal>
 
         <p className="mt-6 text-center text-paper/35 text-xs max-w-lg mx-auto leading-relaxed">
-          A stylized interpretation of Y Street&apos;s storefront and interior
-          &mdash; a real scanned walkthrough of the shop is in the works.
+          This is an early, hand-built preview and not yet an accurate model
+          of the shop &mdash; a true-to-life 3D walkthrough is still in
+          progress.
         </p>
       </div>
     </section>
