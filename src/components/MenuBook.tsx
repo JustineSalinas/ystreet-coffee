@@ -223,14 +223,19 @@ function BackInside() {
 
 function Leaf({
   rotate,
-  zIndex,
+  frontZ,
+  backZ,
+  dragging = false,
   front,
   back,
   isCover = false,
   single = false,
 }: {
   rotate: MotionValue<number>;
-  zIndex: number;
+  /** Stacking order while this leaf rests flat (unflipped) vs. turned (flipped). */
+  frontZ: number;
+  backZ: number;
+  dragging?: boolean;
   front: ReactNode;
   back: ReactNode;
   isCover?: boolean;
@@ -251,6 +256,11 @@ function Leaf({
       "0px 0px 0px rgba(0,0,0,0)",
     ]
   );
+  // Swap stacking order only once the leaf is edge-on (±90°) and effectively
+  // invisible, instead of the instant a page-turn is requested — otherwise the
+  // leaf pops behind/in front of its neighbours mid-turn, worst on a quick
+  // prev-button tap where the swap used to happen before the turn even started.
+  const liveZ = useTransform(rotate, (r) => (r <= -90 ? backZ : frontZ));
 
   return (
     <motion.div
@@ -265,7 +275,7 @@ function Leaf({
         boxShadow: shadow,
         transformStyle: "preserve-3d",
         transformOrigin: "left center",
-        zIndex,
+        zIndex: dragging ? 999 : liveZ,
       }}
     >
       <div
@@ -554,7 +564,9 @@ export default function MenuBook() {
       <Leaf
         key={frontCat.id}
         rotate={rotations[i]}
-        zIndex={dragLeaf === i ? TOTAL + 5 : i < flipped ? i + 1 : TOTAL - i}
+        frontZ={TOTAL - i}
+        backZ={i + 1}
+        dragging={dragLeaf === i}
         front={
           <CategoryPage
             category={frontCat}
@@ -599,7 +611,9 @@ export default function MenuBook() {
         key={i}
         single
         rotate={rotations[i]}
-        zIndex={dragLeaf === i ? TOTAL + 5 : i < flipped ? i + 1 : TOTAL - i}
+        frontZ={TOTAL - i}
+        backZ={i + 1}
+        dragging={dragLeaf === i}
         front={page}
         back={<div className="paper-page h-full w-full" />}
       />
@@ -716,7 +730,9 @@ export default function MenuBook() {
                 isCover
                 single={single}
                 rotate={rotations[0]}
-                zIndex={dragLeaf === 0 ? TOTAL + 5 : 0 < flipped ? 1 : TOTAL}
+                frontZ={TOTAL}
+                backZ={1}
+                dragging={dragLeaf === 0}
                 front={<CoverFront />}
                 back={single ? <div className="paper-page h-full w-full" /> : <CoverInside />}
               />

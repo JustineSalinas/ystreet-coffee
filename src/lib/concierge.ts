@@ -30,15 +30,78 @@ export const OPENING: Reply = {
   chips: DEFAULT_CHIPS,
 };
 
-const normalize = (s: string) =>
-  s
+// Common typos and shorthand seen in real chat, corrected as whole words before
+// anything else runs. This catches far more real messages than the matching
+// logic below ever could on its own.
+const SPELLING_FIXES: [RegExp, string][] = [
+  [/\bexpress?o\b/g, "espresso"],
+  [/\bespreso\b/g, "espresso"],
+  [/\bcapp?uccino\b/g, "cappuccino"],
+  [/\bcapuccino\b/g, "cappuccino"],
+  [/\bmach?iat+o\b/g, "macchiato"],
+  [/\blatt+e\b/g, "latte"],
+  [/\bmocc?a\b/g, "mocha"],
+  [/\bmatcha+\b/g, "matcha"],
+  [/\bmatch\b/g, "matcha"],
+  [/\bfrap+e?\b/g, "frappe"],
+  [/\bfrapp?uccino\b/g, "frappe"],
+  [/\byuzu\b/g, "yuzo"],
+  [/\btapa+\b/g, "tapa"],
+  [/\bsandwh?i?ch\b/g, "sandwich"],
+  [/\bbrekk?y\b/g, "breakfast"],
+  [/\bbrekfast\b/g, "breakfast"],
+  [/\bcarbonara+\b/g, "carbonara"],
+  [/\bwifi?\b/g, "wifi"],
+  [/\bwi fi\b/g, "wifi"],
+  [/\bweath?er\b/g, "weather"],
+  [/\bhrs\b/g, "hours"],
+  [/\baddres+s?\b/g, "address"],
+  [/\bpls\b/g, "please"],
+  [/\bpo\b/g, ""],
+];
+
+const normalize = (s: string) => {
+  let out = s
     .toLowerCase()
     .replace(/[’']/g, "")
     .replace(/[^a-z0-9₱ ]+/g, " ")
     .replace(/\s+/g, " ")
     .trim();
+  for (const [pattern, fix] of SPELLING_FIXES) out = out.replace(pattern, fix);
+  return out.replace(/\s+/g, " ").trim();
+};
 
 const has = (q: string, ...words: string[]) => words.some((w) => q.includes(w));
+
+// Whole word/phrase, not a substring of a longer word — stops "coffee" from
+// tripping "chip" or "hot" from tripping "shot".
+const hasWord = (q: string, ...words: string[]) =>
+  words.some((w) => new RegExp(`\\b${w.replace(/\s+/g, "\\s+")}\\b`).test(q));
+
+// Levenshtein distance, capped early once it exceeds max (cheap for short words).
+function editDistance(a: string, b: string, max: number): number {
+  if (Math.abs(a.length - b.length) > max) return max + 1;
+  const dp = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i++) {
+    let prev = dp[0];
+    dp[0] = i;
+    let rowMin = dp[0];
+    for (let j = 1; j <= b.length; j++) {
+      const tmp = dp[j];
+      dp[j] = a[i - 1] === b[j - 1] ? prev : 1 + Math.min(prev, dp[j], dp[j - 1]);
+      rowMin = Math.min(rowMin, dp[j]);
+      prev = tmp;
+    }
+    if (rowMin > max) return max + 1;
+  }
+  return dp[b.length];
+}
+
+const fuzzyTolerance = (len: number) => (len <= 4 ? 0 : len <= 7 ? 1 : 2);
+
+const fuzzyIncludes = (word: string, target: string) =>
+  editDistance(word, target, fuzzyTolerance(Math.max(word.length, target.length))) <=
+  fuzzyTolerance(Math.max(word.length, target.length));
 
 // The lowest way to order the item (hot is usually cheaper than iced).
 const numericPrice = (item: MenuItem) => {
@@ -55,10 +118,10 @@ const findByName = (name: string): Hit | undefined =>
   allHits().find((h) => h.item.name.toLowerCase() === name.toLowerCase());
 
 const CATEGORY_KEYWORDS: Record<string, string[]> = {
-  espresso: ["espresso", "americano", "cappuccino", "macchiato", "cold brew", "coffee", "brew"],
+  espresso: ["espresso", "americano", "cappuccino", "macchiato", "cold brew", "coffee", "brew", "latte"],
   matcha: ["matcha"],
   "non-coffee": ["non coffee", "noncoffee", "without coffee", "no coffee", "chocolate drink", "hot chocolate", "hot choco", "choco"],
-  frappe: ["frappe", "frappuccino", "blended", "frappes"],
+  frappe: ["frappe", "blended"],
   tea: ["tea", "teas", "iced tea"],
   mains: ["pasta", "rice", "meal", "meals", "burger", "burgers", "carbonara", "pesto", "lunch", "dinner"],
   breakfast: ["breakfast", "brunch", "pancake", "pancakes", "waffle", "waffles", "toast", "muffin", "tapa"],
@@ -74,6 +137,11 @@ function matchCategory(q: string): MenuCategory | undefined {
   }
   return best?.cat;
 }
+
+const GENERIC_WORDS = new Set([
+  "iced", "hot", "coffee", "tea", "matcha", "latte", "chocolate", "frappe",
+  "chicken", "beef", "breakfast", "series", "based", "with", "and", "the",
+]);
 
 function matchItems(q: string): Hit[] {
   const hits = allHits();
@@ -91,13 +159,16 @@ function matchItems(q: string): Hit[] {
     );
   }
 
-  // Fall back to distinctive single words ("carbonara", "yuzo", "tapa").
-  const words = q.split(" ").filter((w) => w.length >= 4);
-  const generic = new Set(["iced", "hot", "coffee", "tea", "matcha", "latte", "chocolate", "frappe", "chicken", "beef", "breakfast", "series", "based"]);
+  // Fall back to distinctive words, tolerating small typos ("carbonarra",
+  // "espreso", "machiato") rather than requiring an exact prefix.
+  const words = q.split(" ").filter((w) => w.length >= 4 && !GENERIC_WORDS.has(w));
+  if (!words.length) return [];
   const scored = hits
     .map((h) => {
       const nameWords = h.item.name.toLowerCase().split(/[\s&]+/);
-      const score = words.filter((w) => !generic.has(w) && nameWords.some((n) => n.startsWith(w))).length;
+      const score = words.filter((w) =>
+        nameWords.some((n) => n.startsWith(w) || fuzzyIncludes(w, n))
+      ).length;
       return { h, score };
     })
     .filter((x) => x.score > 0)
@@ -109,8 +180,44 @@ function pick(names: string[]): Hit[] {
   return names.map(findByName).filter((h): h is Hit => !!h);
 }
 
+// A handful of picks per category for "what's good in your matcha series"-type
+// questions, so a category doesn't get ignored in favour of the generic list.
+const CATEGORY_PICKS: Record<string, string[]> = {
+  espresso: ["Spanish Latte", "Cold Brew", "Caramel Macchiato"],
+  matcha: ["Dirty Matcha", "Strawberry Matcha", "Matcha"],
+  "non-coffee": ["White Chocolate", "Strawberry Frappe"],
+  frappe: ["Salted Caramel", "Toffee Nut"],
+  tea: ["Passionfruit Iced Tea", "Peach Iced Tea"],
+  mains: ["Carbonara", "Chicken Pesto"],
+  breakfast: ["American Breakfast", "French Toast"],
+  snacks: ["Honey Buffalo Tenders", "Grilled Cheese"],
+};
+
+function recommendInCategory(category: MenuCategory): Reply {
+  const names = CATEGORY_PICKS[category.id] ?? category.items.slice(0, 3).map((i) => i.name);
+  return {
+    text: `From ${category.title}, these are the ones people ask for most:`,
+    items: pick(names),
+    chips: [`Show me all of ${category.title.split(" ")[0]}`, "What's good?", "Open the menu"],
+  };
+}
+
 function recommend(q: string): Reply {
   const menuChip = "Open the menu";
+  const negative = hasWord(q, "not", "no", "dont", "isnt", "arent", "less", "skip", "avoid", "without");
+
+  // "recommend a matcha" / "what's good in the tea" should stay in that category.
+  const category = matchCategory(q);
+  if (category) return recommendInCategory(category);
+
+  // "not sweet" / "no sugar" should steer away from the sweet picks, not into them.
+  if (negative && has(q, "sweet", "sugar")) {
+    return {
+      text: "Not a sweet tooth? These lean more roasty than sugary:",
+      items: pick(["Espresso", "Americano", "Cold Brew", "English Breakfast Hot Tea"]),
+      chips: ["Something strong", "Something cold", menuChip],
+    };
+  }
   // "cold weather" must win over "cold" below.
   if (has(q, "rainy", "cold weather", "warm me", "hot drink", "cozy", "cosy", "chilly", "something warm")) {
     return {
@@ -126,18 +233,25 @@ function recommend(q: string): Reply {
       chips: ["Something sweet", "Something strong", menuChip],
     };
   }
-  if (has(q, "sweet", "dessert", "treat", "sugar")) {
+  if (!negative && has(q, "sweet", "dessert", "treat", "sugar")) {
     return {
       text: "On the sweeter side:",
       items: pick(["White Mocha", "Choco Butternut", "Strawberry Matcha", "Caramel Macchiato"]),
       chips: ["Something strong", "Something cold", menuChip],
     };
   }
-  if (has(q, "strong", "caffeine", "tired", "sleepy", "wake", "energy", "kick")) {
+  if (has(q, "strong", "caffeine", "tired", "sleepy", "wake", "energy", "kick", "bitter")) {
     return {
       text: "When you need the caffeine to do its job:",
       items: pick(["Espresso", "Cold Brew", "Dirty Matcha", "Americano"]),
       chips: ["Something sweet", "Something cold", menuChip],
+    };
+  }
+  if (hasWord(q, "quick", "fast", "grab and go", "takeout", "take out", "to go")) {
+    return {
+      text: "Quick to make and easy to take with you:",
+      items: pick(["Espresso", "Cold Brew", "Americano", "Grilled Cheese"]),
+      chips: ["Something cold", "Something to eat", menuChip],
     };
   }
   if (has(q, "eat", "food", "hungry", "meal", "lunch", "dinner", "snack")) {
@@ -195,7 +309,7 @@ export function answer(raw: string): Reply {
   if (!q) return OPENING;
 
   /* --- small talk --- */
-  if (/^(hi|hello|hey|yo|good (morning|afternoon|evening)|kumusta|kamusta)\b/.test(q)) {
+  if (/^(hi|hello|hey|yo|sup|howdy|good ?(morning|afternoon|evening|day)|kumusta|kamusta|magandang)\b/.test(q)) {
     return {
       text: "Hello! Ask me about the menu, prices, hours, or how to find the shop.",
       chips: DEFAULT_CHIPS,
@@ -203,6 +317,18 @@ export function answer(raw: string): Reply {
   }
   if (has(q, "thank", "salamat")) {
     return { text: "Anytime. See you at Y Street!", chips: ["What's good?", "Hours & location"] };
+  }
+  if (has(q, "what can you do", "help me", "what do you do", "how does this work", "what are you")) {
+    return {
+      text: "I know the full menu with prices, hours, directions, Wi-Fi, and the house rules — ask me anything along those lines.",
+      chips: DEFAULT_CHIPS,
+    };
+  }
+  if (has(q, "are you") && has(q, "real", "human", "ai", "bot", "robot")) {
+    return {
+      text: "I'm an automated concierge — quick with the menu and the practical stuff. For anything I can't answer, the team's a message away.",
+      chips: DEFAULT_CHIPS,
+    };
   }
 
   /* --- practical info --- */
@@ -228,7 +354,7 @@ export function answer(raw: string): Reply {
       chips: ["What are your hours?", "Do you have Wi-Fi?"],
     };
   }
-  if (has(q, "wifi", "wi fi", "internet", "charg", "outlet", "socket", "plug", "laptop", "study", "work", "remote")) {
+  if (has(q, "wifi", "internet", "charg", "outlet", "socket", "plug", "laptop", "study", "work", "remote")) {
     return {
       text: "Yes — free Wi-Fi and charging outlets, and regulars say it's a quiet spot for working. Mornings are the calmest.",
       chips: ["What are your hours?", "Something strong", "Where are you?"],
@@ -241,7 +367,7 @@ export function answer(raw: string): Reply {
       chips: ["Where are you?", "What's good?"],
     };
   }
-  if (has(q, "pet", "dog", "cat", "outside food", "bring food", "own food", "smok")) {
+  if (hasWord(q, "pet", "dog", "cat") || has(q, "outside food", "bring food", "own food", "smok")) {
     return {
       text: "Outside food isn't allowed, and pets aren't permitted inside the shop.",
       chips: ["Do you serve food?", "What are your hours?"],
@@ -261,8 +387,8 @@ export function answer(raw: string): Reply {
   const priced = priceFilter(q, category);
   if (priced) return priced;
 
-  const wantsPick = has(q, "recommend", "suggest", "whats good", "what is good", "best", "popular", "favourite", "favorite", "must try", "signature", "something ");
-  const hasMood = has(q, "caffeine", "tired", "sleepy", "wake", "energy", "hungry", "sweet", "rainy", "chilly", "hot day", "humid", "refresh");
+  const wantsPick = has(q, "recommend", "suggest", "whats good", "what is good", "best", "popular", "favourite", "favorite", "must try", "signature", "bestseller", "number one", "something ") || hasWord(q, "top");
+  const hasMood = has(q, "caffeine", "tired", "sleepy", "wake", "energy", "hungry", "sweet", "rainy", "chilly", "hot day", "humid", "refresh", "bitter", "quick", "cold", "cool", "iced", "warm") || hasWord(q, "fast");
   if (wantsPick || hasMood) {
     return recommend(q);
   }
@@ -271,10 +397,13 @@ export function answer(raw: string): Reply {
   const askingForCategory = has(q, "show", "list", "all", "what do you have", "options", "menu", "kinds", "types");
   if (items.length && !(askingForCategory && category)) {
     const one = items.length === 1;
+    const comparing = items.length > 1 && has(q, " or ", " vs ", " versus ", "compare", "difference");
     return {
       text: one
         ? `${items[0].item.name} — ${items[0].item.description ?? `from our ${items[0].category.title.toLowerCase()}.`}`
-        : "Here's what matches:",
+        : comparing
+          ? "Here's how they compare:"
+          : "Here's what matches:",
       items,
       chips: [
         `Show me ${items[0].category.title.split(" ")[0].toLowerCase()}`,
