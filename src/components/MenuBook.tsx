@@ -690,17 +690,14 @@ export default function MenuBook() {
                 </div>
               ) : (
                 <div className="absolute inset-0 flex">
-                  {/* No page content here by design: this is the binding/shadow
-                      backdrop behind the left leaf stack, only glimpsed for an
-                      instant when 3D perspective foreshortens a turning leaf.
-                      Real content always comes from whichever leaf has flipped
-                      to rest here — showing a blank page here (instead of the
-                      dark spine colour) used to read as a phantom empty page. */}
-                  <motion.div
-                    animate={{ opacity: isClosed ? 0 : 1 }}
-                    transition={{ duration: 0.4 }}
-                    className="relative h-full w-1/2 rounded-l-[6px] bg-charcoal shadow-[0_40px_90px_-20px_rgba(0,0,0,0.8)]"
-                  />
+                  {/* Deliberately no left panel here: the leaves already cover this
+                      half correctly at rest (see the z-index fix on rotate above),
+                      so a static panel underneath only ever showed up as a visible
+                      phantom page — first cream, then (still wrong) as a solid
+                      charcoal block behind a leaf foreshortened by perspective mid-
+                      turn. Leaving it empty lets the section's own near-black
+                      background show through instead, which is seamless. */}
+                  <div className="relative h-full w-1/2" />
                   <div className="relative h-full w-1/2 rounded-r-[6px] bg-charcoal shadow-[0_40px_90px_-20px_rgba(0,0,0,0.8)]">
                     <div className="absolute inset-y-[var(--board)] right-[var(--board)] left-0 overflow-hidden rounded-r-[2px]">
                       <BackInside />
