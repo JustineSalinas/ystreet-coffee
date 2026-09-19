@@ -3,7 +3,6 @@
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { Canvas, useFrame, useThree, useLoader } from "@react-three/fiber";
 import { ContactShadows } from "@react-three/drei";
-import { ArrowUp, ArrowDown, ArrowLeft, ArrowRight } from "lucide-react";
 import * as THREE from "three";
 
 /* ------------------------------- facade proportions -------------------------------- */
@@ -596,36 +595,6 @@ function Scene({
 
 /* --------------------------------------- outer wrapper ------------------------------------ */
 
-function DPadButton({
-  icon: Icon,
-  onDown,
-  onUp,
-  className,
-}: {
-  icon: typeof ArrowUp;
-  onDown: () => void;
-  onUp: () => void;
-  className: string;
-}) {
-  return (
-    <button
-      aria-label="Move"
-      onPointerDown={(e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        onDown();
-      }}
-      onPointerUp={onUp}
-      onPointerLeave={onUp}
-      onPointerCancel={onUp}
-      className={`absolute z-20 flex h-11 w-11 items-center justify-center rounded-full border border-gold/40 bg-obsidian/50 text-gold backdrop-blur-sm active:bg-gold active:text-obsidian ${className}`}
-      style={{ touchAction: "none" }}
-    >
-      <Icon className="h-5 w-5" strokeWidth={1.75} />
-    </button>
-  );
-}
-
 export default function ShopScene() {
   const moveState = useRef<MoveState>({ f: false, b: false, l: false, r: false });
   const lookState = useRef<LookState>({ yaw: 0, pitch: -0.04 });
@@ -710,31 +679,6 @@ export default function ShopScene() {
           </span>
         </div>
       )}
-
-      <DPadButton
-        icon={ArrowUp}
-        onDown={() => setMove("f", true)}
-        onUp={() => setMove("f", false)}
-        className="bottom-16 left-14"
-      />
-      <DPadButton
-        icon={ArrowDown}
-        onDown={() => setMove("b", true)}
-        onUp={() => setMove("b", false)}
-        className="bottom-4 left-14"
-      />
-      <DPadButton
-        icon={ArrowLeft}
-        onDown={() => setMove("l", true)}
-        onUp={() => setMove("l", false)}
-        className="bottom-4 left-2"
-      />
-      <DPadButton
-        icon={ArrowRight}
-        onDown={() => setMove("r", true)}
-        onUp={() => setMove("r", false)}
-        className="bottom-4 left-[6.5rem]"
-      />
     </div>
   );
 }
